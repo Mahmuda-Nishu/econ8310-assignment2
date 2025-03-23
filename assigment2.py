@@ -7,11 +7,13 @@ Original file is located at
     https://colab.research.google.com/drive/10amAjeH1rmyShztPSzH2feEc1J8e_sKk
 """
 
+# assignment2.py
+
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
-# Load training and test data
+# Load data
 train_url = "https://raw.githubusercontent.com/dustywhite7/Econ8310/master/AssignmentData/assignment3.csv"
 test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
 
@@ -19,48 +21,39 @@ train_data = pd.read_csv(train_url)
 test_data = pd.read_csv(test_url)
 
 # Drop rows with missing target
-train_data = train_data.dropna(subset=['meal'])
+train_data = train_data.dropna(subset=["meal"])
 
-# Fill missing values in both datasets
+# Fill missing values
 train_data = train_data.fillna(0)
 test_data = test_data.fillna(0)
 
-# Encode categorical variables
-categorical_cols = train_data.select_dtypes(include=['object']).columns
+# Encode categorical variables (fit on train, transform test)
+categorical_cols = train_data.select_dtypes(include="object").columns
 label_encoders = {}
 
 for col in categorical_cols:
     le = LabelEncoder()
-    train_values = train_data[col].astype(str)
-    test_values = test_data[col].astype(str)
-
-    # Fit on training data
-    le.fit(train_values)
+    train_data[col] = le.fit_transform(train_data[col].astype(str))
+    test_data[col] = test_data[col].astype(str).apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
     label_encoders[col] = le
 
-    # Transform training data
-    train_data[col] = le.transform(train_values)
+# Define input and output
+X_train = train_data.drop(columns=["meal"])
+y_train = train_data["meal"]
+X_test = test_data.drop(columns=["meal"], errors='ignore')
 
-    # Transform test data with handling unseen labels
-    test_data[col] = test_values.apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
-
-# Split into features and target
-X_train = train_data.drop(columns=['meal'])
-y_train = train_data['meal']
-X_test = test_data.drop(columns=['meal'], errors='ignore')  # drop target if it exists
-
-# Model: Random Forest
+# ✅ Required variable: model
 model = RandomForestClassifier(random_state=42)
 
-# Fit the model
+# ✅ Required variable: modelFit
 modelFit = model.fit(X_train, y_train)
 
-# Generate binary predictions
+# ✅ Required variable: pred
 pred = modelFit.predict(X_test)
-pred = pd.Series(pred, name="meal_prediction")
+pred = [int(p) for p in pred]  # convert to list of 0s and 1s
 
-# Save predictions (optional)
-pred.to_csv("assignment2_predictions.csv", index=False)
+# Optional: Save predictions
+pd.Series(pred).to_csv("assignment2_predictions.csv", index=False)
 
-# Print preview
-print("First 10 predictions:", pred.head(10).to_list())
+# Optional: Print preview
+print("First 10 predictions:", pred[:10])
