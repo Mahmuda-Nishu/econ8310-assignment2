@@ -13,55 +13,40 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
-# Load datasets
-train_url = "https://raw.githubusercontent.com/dustywhite7/Econ8310/master/AssignmentData/assignment3.csv"
+# Load training and test data
+train_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3.csv"
 test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
 
+df_train = pd.read_csv(train_url)
+df_test = pd.read_csv(test_url)
 
-train_data = pd.read_csv(train_url)
-test_data = pd.read_csv(test_url)
+# Drop irrelevant columns
+df_train = df_train.drop(['id', 'DateTime'], axis=1)
+df_test = df_test.drop(['id', 'DateTime'], axis=1)
 
-# Drop rows with missing 'meal' value
-train_data = train_data.dropna(subset=["meal"])
-
-# Fill missing values
-train_data = train_data.fillna(0)
-test_data = test_data.fillna(0)
-
-# Encode string (categorical) columns
-cat_cols = train_data.select_dtypes(include="object").columns
+# Handle categorical variables
+categorical_cols = df_train.select_dtypes(include='object').columns
 encoders = {}
-
-for col in cat_cols:
+for col in categorical_cols:
     le = LabelEncoder()
-    train_data[col] = le.fit_transform(train_data[col].astype(str))
-    # Handle unseen labels in test
-    test_data[col] = test_data[col].astype(str).apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
+    df_train[col] = le.fit_transform(df_train[col].astype(str))
+    df_test[col] = df_test[col].astype(str).apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
     encoders[col] = le
 
-# Separate inputs and target
-X_train = train_data.drop(columns=["meal"])
-y_train = train_data["meal"]
-
-# Drop 'meal' if exists in test data
-X_test = test_data.drop(columns=["meal"], errors="ignore")
-
-# ========== REQUIRED VARIABLES FOR AUTOGRADER ==========
+# Split into features and target
+X_train = df_train.drop('meal', axis=1)
+y_train = df_train['meal']
+X_test = df_test[X_train.columns]  # Ensure exact same structure
 
 # Define model
 model = RandomForestClassifier(random_state=42)
-
-# Fit the model
 model.fit(X_train, y_train)
 
-# Assign the fitted model
+# Assign fitted model to modelFit (critical for autograder)
 modelFit = model
 
-# Generate binary predictions
-pred = modelFit.predict(X_test)
+# Predict
+pred = [int(x) for x in modelFit.predict(X_test)]
 
-# Convert to list of integers (0 or 1)
-pred = [int(p) for p in pred]
-
-# Preview output
+# Print preview
 print("First 10 predictions:", pred[:10])
