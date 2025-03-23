@@ -13,48 +13,55 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
-# Load data
+# Load datasets
 train_url = "https://raw.githubusercontent.com/dustywhite7/Econ8310/master/AssignmentData/assignment3.csv"
 test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
+
 
 train_data = pd.read_csv(train_url)
 test_data = pd.read_csv(test_url)
 
-# Drop rows with missing target
+# Drop rows with missing 'meal' value
 train_data = train_data.dropna(subset=["meal"])
 
 # Fill missing values
 train_data = train_data.fillna(0)
 test_data = test_data.fillna(0)
 
-# Encode categorical variables (fit on train, transform test)
-categorical_cols = train_data.select_dtypes(include="object").columns
-label_encoders = {}
+# Encode string (categorical) columns
+cat_cols = train_data.select_dtypes(include="object").columns
+encoders = {}
 
-for col in categorical_cols:
+for col in cat_cols:
     le = LabelEncoder()
     train_data[col] = le.fit_transform(train_data[col].astype(str))
+    # Handle unseen labels in test
     test_data[col] = test_data[col].astype(str).apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
-    label_encoders[col] = le
+    encoders[col] = le
 
-# Define input and output
+# Separate inputs and target
 X_train = train_data.drop(columns=["meal"])
 y_train = train_data["meal"]
-X_test = test_data.drop(columns=["meal"], errors='ignore')
 
-# ✅ Required variable: model
+# Drop 'meal' if exists in test data
+X_test = test_data.drop(columns=["meal"], errors="ignore")
+
+# ========== REQUIRED VARIABLES FOR AUTOGRADER ==========
+
+# Define model
 model = RandomForestClassifier(random_state=42)
+
+# Fit the model
 model.fit(X_train, y_train)
 
-# ✅ Required variable: modelFit (same object as model)
+# Assign the fitted model
 modelFit = model
 
-# ✅ Required variable: pred
+# Generate binary predictions
 pred = modelFit.predict(X_test)
-pred = [int(p) for p in pred]  # convert to list of 0s and 1s
 
-# Optional: Save predictions
-pd.Series(pred).to_csv("assignment2_predictions.csv", index=False)
+# Convert to list of integers (0 or 1)
+pred = [int(p) for p in pred]
 
-# Optional: Print preview
+# Preview output
 print("First 10 predictions:", pred[:10])
