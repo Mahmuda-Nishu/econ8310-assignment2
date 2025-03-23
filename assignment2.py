@@ -13,50 +13,45 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import cross_val_score
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 import xgboost as xgb
-from sklearn.preprocessing import LabelEncoder
 
-train_data = pd.read_csv("https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3.csv")
-test_data = pd.read_csv("https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv")
+train_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3.csv"
+df_train = pd.read_csv(train_url)
+df_train = df_train.drop(['id', 'DateTime'], axis=1)
+X_train = df_train.drop('meal', axis=1)
+y_train = df_train['meal']
 
-for df in [train_data, test_data]:
-    df.drop(columns=["id", "DateTime"], inplace=True, errors='ignore')
-
-label_encoders = {}
-for col in train_data.select_dtypes(include="object").columns:
-    le = LabelEncoder()
-    train_data[col] = le.fit_transform(train_data[col].astype(str))
-    test_data[col] = test_data[col].astype(str).apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
-    label_encoders[col] = le
-
-X_train = train_data.drop(columns=["meal"])
-y_train = train_data["meal"]
-X_test = test_data[X_train.columns]
-
-models = {
-    "decision_tree": DecisionTreeClassifier(random_state=42),
-    "random_forest": RandomForestClassifier(random_state=42),
-    "xgboost": xgb.XGBClassifier(random_state=42, eval_metric='logloss')  # No warning now
+cv_models = {
+    'Decision Tree': DecisionTreeClassifier(random_state=42),
+    'Random Forest': RandomForestClassifier(random_state=42),
+    'XGBClassifier': xgb.XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss'),
+    'Gradient Boosting': GradientBoostingClassifier(random_state=42)
 }
+cv_scores = {}
+print("Cross-Validation Accuracy Scores:")
+for name, candidate in cv_models.items():
+    scores = cross_val_score(candidate, X_train, y_train, cv=5, scoring='accuracy')
+    cv_scores[name] = np.mean(scores)
+    print(f"{name}: {np.mean(scores):.4f}")
 
+best_model_name = max(cv_scores, key=cv_scores.get)
+print("\nBest model based on CV accuracy:", best_model_name)
 
-scores = {}
-print("Evaluating models with 5-fold cross-validation:")
-for name, m in models.items():
-    cv_score = cross_val_score(m, X_train, y_train, cv=5, scoring="accuracy")
-    scores[name] = np.mean(cv_score)
-    print(f"{name}: {scores[name]:.4f}")
+model = DecisionTreeClassifier(random_state=42)
+modelFit = model.fit(X_train, y_train)
 
-best_model_name = max(scores, key=scores.get)
-print(f"\nBest model selected: {best_model_name}")
+test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
+df_test = pd.read_csv(test_url)
+df_test = df_test.drop(['id', 'DateTime'], axis=1)
 
-model = models[best_model_name]
-model.fit(X_train, y_train)
-modelFit = model
+if 'meal' in df_test.columns:
+    df_test = df_test.drop('meal', axis=1)
 
-raw_preds = modelFit.predict(X_test)
-pred = [int(val) for val in raw_preds]
+predictions = modelFit.predict(df_test)
 
+predictions = predictions.flatten()
+
+pred = predictions.astype(int).tolist()
+print("Length of pred:", len(pred))
 print("First 10 predictions:", pred[:10])
-print("Total predictions:", len(pred))
