@@ -44,9 +44,10 @@ X_test = test_data.drop(columns=["meal"], errors='ignore')
 
 # ✅ Required variable: model
 model = RandomForestClassifier(random_state=42)
+model.fit(X_train, y_train)
 
-# ✅ Required variable: modelFit
-modelFit = model.fit(X_train, y_train)
+# ✅ Required variable: modelFit (same object as model)
+modelFit = model
 
 # ✅ Required variable: pred
 pred = modelFit.predict(X_test)
