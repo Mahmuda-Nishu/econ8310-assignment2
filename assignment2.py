@@ -10,43 +10,53 @@ Original file is located at
 # assignment2.py
 
 import pandas as pd
+import numpy as np
+from sklearn.model_selection import cross_val_score
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
 from sklearn.preprocessing import LabelEncoder
 
-# Load training and test data
-train_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3.csv"
-test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
+train_data = pd.read_csv("https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3.csv")
+test_data = pd.read_csv("https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv")
 
-df_train = pd.read_csv(train_url)
-df_test = pd.read_csv(test_url)
+for df in [train_data, test_data]:
+    df.drop(columns=["id", "DateTime"], inplace=True, errors='ignore')
 
-# Drop irrelevant columns
-df_train = df_train.drop(['id', 'DateTime'], axis=1)
-df_test = df_test.drop(['id', 'DateTime'], axis=1)
-
-# Handle categorical variables
-categorical_cols = df_train.select_dtypes(include='object').columns
-encoders = {}
-for col in categorical_cols:
+label_encoders = {}
+for col in train_data.select_dtypes(include="object").columns:
     le = LabelEncoder()
-    df_train[col] = le.fit_transform(df_train[col].astype(str))
-    df_test[col] = df_test[col].astype(str).apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
-    encoders[col] = le
+    train_data[col] = le.fit_transform(train_data[col].astype(str))
+    test_data[col] = test_data[col].astype(str).apply(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
+    label_encoders[col] = le
 
-# Split into features and target
-X_train = df_train.drop('meal', axis=1)
-y_train = df_train['meal']
-X_test = df_test[X_train.columns]  # Ensure exact same structure
+X_train = train_data.drop(columns=["meal"])
+y_train = train_data["meal"]
+X_test = test_data[X_train.columns]
 
-# Define model
-model = RandomForestClassifier(random_state=42)
+models = {
+    "decision_tree": DecisionTreeClassifier(random_state=42),
+    "random_forest": RandomForestClassifier(random_state=42),
+    "xgboost": xgb.XGBClassifier(random_state=42, eval_metric='logloss')  # No warning now
+}
+
+
+scores = {}
+print("Evaluating models with 5-fold cross-validation:")
+for name, m in models.items():
+    cv_score = cross_val_score(m, X_train, y_train, cv=5, scoring="accuracy")
+    scores[name] = np.mean(cv_score)
+    print(f"{name}: {scores[name]:.4f}")
+
+best_model_name = max(scores, key=scores.get)
+print(f"\nBest model selected: {best_model_name}")
+
+model = models[best_model_name]
 model.fit(X_train, y_train)
-
-# Assign fitted model to modelFit (critical for autograder)
 modelFit = model
 
-# Predict
-pred = [int(x) for x in modelFit.predict(X_test)]
+raw_preds = modelFit.predict(X_test)
+pred = [int(val) for val in raw_preds]
 
-# Print preview
 print("First 10 predictions:", pred[:10])
+print("Total predictions:", len(pred))
