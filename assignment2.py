@@ -9,61 +9,70 @@ Original file is located at
 
 # assignment2.py
 
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-import xgboost as xgb
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, roc_auc_score
+import joblib  # for saving model
 
-# Load training data
-train_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3.csv"
-df_train = pd.read_csv(train_url)
-df_train = df_train.drop(['id', 'DateTime'], axis=1)
+# Step 1: Load data
+train_df = pd.read_csv("https://raw.githubusercontent.com/dustywhite7/Econ8310/master/AssignmentData/assignment3.csv")
+test_df = pd.read_csv("https://raw.githubusercontent.com/dustywhite7/Econ8310/master/AssignmentData/assignment3test.csv")
 
-# Define features and label
-X_train = df_train.drop('meal', axis=1)
-y_train = df_train['meal']
+# Step 2: Prepare features and target
+X = train_df.drop(columns=['meal'])
+y = train_df['meal']
 
-# Define all models to evaluate
-cv_models = {
-    'Decision Tree': DecisionTreeClassifier(random_state=42),
-    'Random Forest': RandomForestClassifier(random_state=42),
-    'XGBClassifier': xgb.XGBClassifier(random_state=42, eval_metric='logloss'),
-    'Gradient Boosting': GradientBoostingClassifier(random_state=42)
+# Step 3: One-hot encode categorical features
+X = pd.get_dummies(X)
+test_df = pd.get_dummies(test_df)
+test_df = test_df.reindex(columns=X.columns, fill_value=0)
+
+# Step 4: Split training data for model evaluation
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 5: Define candidate models
+models = {
+    "DecisionTree": DecisionTreeClassifier(random_state=42),
+    "RandomForest": RandomForestClassifier(random_state=42),
+    "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="logloss", random_state=42)
 }
 
-# Evaluate models using cross-validation
-cv_scores = {}
-print("Cross-Validation Accuracy Scores:")
-for name, model_candidate in cv_models.items():
-    scores = cross_val_score(model_candidate, X_train, y_train, cv=5, scoring='accuracy')
-    cv_scores[name] = np.mean(scores)
-    print(f"{name}: {cv_scores[name]:.4f}")
+# Step 6: Train models and evaluate performance
+best_model_name = None
+best_accuracy = 0
+best_auc = 0
+model = None
 
-# Select the best-performing model
-best_model_name = max(cv_scores, key=cv_scores.get)
-print("\nBest model based on CV accuracy:", best_model_name)
+for name, clf in models.items():
+    clf.fit(X_train, y_train)
+    preds = clf.predict(X_val)
+    proba = clf.predict_proba(X_val)[:, 1]
+    acc = accuracy_score(y_val, preds)
+    auc = roc_auc_score(y_val, proba)
+    print(f"{name} Accuracy: {acc:.4f} | AUC: {auc:.4f}")
 
-# Initialize and train the best model
-model = cv_models[best_model_name]
-modelFit = model.fit(X_train, y_train)
+    if acc > best_accuracy:
+        best_accuracy = acc
+        best_auc = auc
+        best_model_name = name
+        model = clf
 
-# Load test data
-test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
-df_test = pd.read_csv(test_url)
-df_test = df_test.drop(['id', 'DateTime'], axis=1)
-df_test = df_test.drop('meal', axis=1, errors='ignore')  # In case 'meal' is present
+print(f"\n✅ Best model selected: {best_model_name}")
+print(f"   Accuracy: {best_accuracy:.4f}")
+print(f"   AUC: {best_auc:.4f}")
 
-# Make predictions on test data
-predictions = modelFit.predict(df_test)
+# Step 7: Refit the best model on full training data
+modelFit = model.fit(X, y)
 
-# Convert to list of 0s and 1s as required
-pred = [int(p) for p in predictions]
+# Step 8: Save the trained model
+joblib.dump(modelFit, "best_modelFit.pkl")
 
-# Output checks
-print("Length of pred:", len(pred))
-print("First 10 predictions:", pred[:10])
+# Step 9: Predict on test set
+pred = modelFit.predict(test_df)
+pd.Series(pred, name="meal").to_csv("meal_predictions.csv", index=False)
+
+print("\n✅ Model saved as 'best_modelFit.pkl'")
+print("✅ Predictions saved to 'meal_predictions.csv'")
