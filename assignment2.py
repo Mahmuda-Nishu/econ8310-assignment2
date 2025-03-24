@@ -16,39 +16,37 @@ from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 import joblib
 
-# Load training data
+# Load datasets
 train_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3.csv"
+test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
 data = pd.read_csv(train_url)
+test_data = pd.read_csv(test_url)
 
-# Define target variable and features
+ # Drop non-numeric columns
+test_data = test_data.drop(columns=['id', 'DateTime'])
+test_data = pd.get_dummies(test_data, drop_first=True)
+test_data = test_data.reindex(columns=X.columns, fill_value=0) #ensure the same colunms
+
+# target variable and features defining
 y = data['meal']
 X = data.drop(columns=['meal', 'id', 'DateTime'])  # Remove non-numeric columns
 X = pd.get_dummies(X, drop_first=True)  # Convert categorical features if any
 
-# Split dataset into training and testing sets
+# Split dataset(training and testing sets)
 x, xt, y, yt = train_test_split(X, y, test_size=0.1, random_state=42)
 
-# Define the best-performing model
+#best-performing model
 model = XGBClassifier(n_estimators=100, max_depth=8, learning_rate=0.2, random_state=42, objective='binary:logistic')
 
 # Train the model
 modelFit = model.fit(x, y)
 
-# Load test data
-test_url = "https://github.com/dustywhite7/Econ8310/raw/master/AssignmentData/assignment3test.csv"
-test_data = pd.read_csv(test_url)
-test_data = test_data.drop(columns=['id', 'DateTime'])  # Drop non-numeric columns
-test_data = pd.get_dummies(test_data, drop_first=True)
-test_data = test_data.reindex(columns=X.columns, fill_value=0)  # Ensure same columns
-
-# Make predictions using the trained model
+#predictions
 pred = modelFit.predict(test_data)
 pred = [int(p) for p in pred]  # Convert to required format
-
-# Save predictions
 pd.DataFrame(pred, columns=["meal_prediction"]).to_csv("predictions.csv", index=False)
 
 # Save the trained model
 joblib.dump(modelFit, "modelFit.pkl")
 
-print("Best model selected and predictions saved successfully.")
+print("Model selection completed and predictions have been saved.")
